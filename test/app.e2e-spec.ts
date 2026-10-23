@@ -4,7 +4,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module.js';
 
-describe('AppController (e2e)', () => {
+describe('Hello (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
@@ -16,11 +16,17 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  it('GET /hello greets using a public user', async () => {
+    const response = await request(app.getHttpServer()).get('/hello').expect(200);
+
+    expect(response.body.message).toBe('Hello World!');
+    expect(response.body.user).toMatchObject({
+      name: 'Annorent',
+      email: 'hello@annorent.cm',
+      role: 'admin',
+      kycStatus: 'verified',
+    });
+    expect(response.body.user).not.toHaveProperty('passwordHash');
   });
 
   afterEach(async () => {
