@@ -1,0 +1,38 @@
+GET /hello
+Headers: none
+Body: none
+
+200 OK
+{
+  "message": "Hello World!",
+  "user": {
+    "userId": "00000000-0000-4000-8000-000000000001",
+    "name": "Annorent",
+    "email": "hello@annorent.cm",
+    "phoneNumber": null,
+    "role": "admin",
+    "kycStatus": "verified",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  }
+}
+
+POST /auth/register
+Headers: none
+Body: {"name":"John Doe","email":"john@example.com","password":"password123","phoneNumber":null}
+200
+{"user":{"userId":"...","name":"John Doe","email":"john@example.com","role":"tenant","kycStatus":"pending",...},"accessToken":"...","refreshToken":"..."}
+
+POST /auth/login
+Headers: none
+Body: {"email":"john@example.com","password":"password123"}
+200 same shape
+
+POST /auth/refresh
+Headers: none
+Body: {"refreshToken":"..."}
+200 {"accessToken":"...","refreshToken":"..."}
+
+GET /auth/me
+Headers: Authorization: Bearer <accessToken>
+200 PublicUser
