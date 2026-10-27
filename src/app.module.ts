@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { DatabaseModule } from './db/dbModule.js';
 import { UserModule } from './userModule.js';
 import { AuthModule } from './auth/authModule.js';
+import { SanitizeMiddleware } from './middleware/sanitizeMiddleware.js';
 
 @Module({
   imports: [
@@ -17,4 +18,8 @@ import { AuthModule } from './auth/authModule.js';
     UserModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(SanitizeMiddleware).forRoutes('*');
+  }
+}

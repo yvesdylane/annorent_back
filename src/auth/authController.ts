@@ -70,28 +70,20 @@ export class AuthController {
   @Get('reset-password')
   resetPasswordPage(@Query('token') token: string) {
     const safeToken = (token || '').replace(/"/g, '&quot;');
-    return `<html><body><h2>Password Reset</h2><p>A verification code will be sent to the phone number on file for this account.</p><p>Click next to proceed to enter the code sent to your phone number.</p><form method="post" action="/auth/reset-password/confirm"><input type="hidden" name="token" value="${safeToken}"/><button type="submit">Next</button></form></body></html>`;
-  }
-
-  @Post('reset-password/confirm')
-  async resetPasswordConfirm(@Body() body: any, @Res() res: Response) {
-    const token = body?.token || '';
-    return res.redirect(`/auth/reset-password/verify?token=${encodeURIComponent(token)}`);
-  }
-
-  @Get('reset-password/verify')
-  resetPasswordVerifyPage(@Query('token') token: string) {
-    const safeToken = (token || '').replace(/"/g, '&quot;');
-    return `<html><body><h2>Enter Verification Code</h2><p>A code has been sent to your phone number (SMS feature coming soon).</p><form method="post" action="/auth/reset-password"><input type="hidden" name="token" value="${safeToken}"/><input name="newPassword" type="password" placeholder="New password" minlength="8" required/><input name="code" placeholder="Enter code" required/><button type="submit">Reset Password</button></form></body></html>`;
+    return `<html><body><h2>Reset Your Password</h2><form method="post" action="/auth/reset-password"><input type="hidden" name="token" value="${safeToken}"/><input name="newPassword" type="password" placeholder="New password" minlength="8" required/><input name="confirmPassword" type="password" placeholder="Confirm password" minlength="8" required/><button type="submit">Reset Password</button></form></body></html>`;
   }
 
   @Post('reset-password')
   async resetPassword(@Body() dto: any) {
     const body: any = dto;
-    const token = body.token || body.resetToken || body.reset_password_token || body.code;
-    const newPassword = body.newPassword || body.password || body.confirmPassword;
+    const token = body.token || body.resetToken || body.reset_password_token;
+    const newPassword = body.newPassword || body.password;
+    const confirmPassword = body.confirmPassword;
     if (!token || !newPassword) {
       throw new Error('Invalid or expired password reset token');
+    }
+    if (confirmPassword && newPassword !== confirmPassword) {
+      throw new Error('Passwords do not match');
     }
     return this.authService.resetPassword(token as string, newPassword as string);
   }
@@ -122,10 +114,14 @@ export class AuthController {
   @Post('resetPassword')
   async resetPasswordAlt(@Body() dto: any) {
     const body: any = dto;
-    const token = body.token || body.resetToken || body.reset_password_token || body.code;
-    const newPassword = body.newPassword || body.password || body.confirmPassword;
+    const token = body.token || body.resetToken || body.reset_password_token;
+    const newPassword = body.newPassword || body.password;
+    const confirmPassword = body.confirmPassword;
     if (!token || !newPassword) {
       throw new Error('Invalid or expired password reset token');
+    }
+    if (confirmPassword && newPassword !== confirmPassword) {
+      throw new Error('Passwords do not match');
     }
     return this.authService.resetPassword(token as string, newPassword as string);
   }
@@ -149,10 +145,14 @@ export class AuthController {
   @Post('password/reset')
   async resetPasswordNested(@Body() dto: any) {
     const body: any = dto;
-    const token = body.token || body.resetToken || body.reset_password_token || body.code;
-    const newPassword = body.newPassword || body.password || body.confirmPassword;
+    const token = body.token || body.resetToken || body.reset_password_token;
+    const newPassword = body.newPassword || body.password;
+    const confirmPassword = body.confirmPassword;
     if (!token || !newPassword) {
       throw new Error('Invalid or expired password reset token');
+    }
+    if (confirmPassword && newPassword !== confirmPassword) {
+      throw new Error('Passwords do not match');
     }
     return this.authService.resetPassword(token as string, newPassword as string);
   }
