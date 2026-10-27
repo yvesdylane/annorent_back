@@ -1,38 +1,91 @@
-GET /hello
-Headers: none
-Body: none
+@baseUrl = http://localhost:3000
+@email = john@example.com
+@password = password123
 
-200 OK
+### GET /hello
+GET {{baseUrl}}/hello
+Accept: application/json
+
+> {%
+  client.test("Request executed successfully", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.body.message === "Hello World!", "Unexpected message");
+  });
+%}
+
+### POST /auth/register
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+Accept: application/json
+
 {
-  "message": "Hello World!",
-  "user": {
-    "userId": "00000000-0000-4000-8000-000000000001",
-    "name": "Annorent",
-    "email": "hello@annorent.cm",
-    "phoneNumber": null,
-    "role": "admin",
-    "kycStatus": "verified",
-    "createdAt": "2026-01-01T00:00:00.000Z",
-    "updatedAt": "2026-01-01T00:00:00.000Z"
-  }
+  "name": "John Doe",
+  "email": "{{email}}",
+  "password": "{{password}}",
+  "phoneNumber": null
 }
 
-POST /auth/register
-Headers: none
-Body: {"name":"John Doe","email":"john@example.com","password":"password123","phoneNumber":null}
-200
-{"user":{"userId":"...","name":"John Doe","email":"john@example.com","role":"tenant","kycStatus":"pending",...},"accessToken":"...","refreshToken":"..."}
+> {%
+  client.test("User registered", function () {
+    client.assert(response.status === 201 || response.status === 200, "Expected 2xx response");
+    client.assert(!!response.body.accessToken, "Missing accessToken");
+    client.assert(!!response.body.refreshToken, "Missing refreshToken");
+  });
+  client.global.set("accessToken", response.body.accessToken);
+  client.global.set("refreshToken", response.body.refreshToken);
+%}
 
-POST /auth/login
-Headers: none
-Body: {"email":"john@example.com","password":"password123"}
-200 same shape
+### POST /auth/login
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+Accept: application/json
 
-POST /auth/refresh
-Headers: none
-Body: {"refreshToken":"..."}
-200 {"accessToken":"...","refreshToken":"..."}
+{
+  "email": "{{email}}",
+  "password": "{{password}}"
+}
 
-GET /auth/me
-Headers: Authorization: Bearer <accessToken>
-200 PublicUser
+> {%
+  client.test("User logged in", function () {
+    client.assert(response.status === 200 || response.status === 201, "Expected 2xx response");
+    client.assert(!!response.body.accessToken, "Missing accessToken");
+  });
+  client.global.set("accessToken", response.body.accessToken);
+  client.global.set("refreshToken", response.body.refreshToken);
+%}
+
+### POST /auth/refresh
+# @name refresh
+POST {{baseUrl}}/auth/refresh
+Content-Type: application/json
+Accept: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+> {%
+  client.test("Tokens refreshed", function () {
+    client.assert(response.status === 200 || response.status === 201, "Expected 2xx response");
+    client.assert(!!response.body.accessToken, "Missing accessToken");
+  });
+  client.global.set("accessToken", response.body.accessToken);
+  client.global.set("refreshToken", response.body.refreshToken);
+%}
+
+### GET /auth/me
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+> {%
+  client.test("Current user returned", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(!!response.body.userId, "Missing userId");
+  });
+%}
+
+### GET /auth/google
+GET {{baseUrl}}/auth/google

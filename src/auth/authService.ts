@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'node:crypto';
 import { UserService } from '../users/userService.js';
 import { DatabaseService } from '../db/databaseService.js';
 import { jwtConstants } from './constants.js';
@@ -8,6 +9,7 @@ import { RegisterDto } from './dto/registerDto.js';
 import { LoginDto } from './dto/loginDto.js';
 import { VerificationStatus, UserRole } from '../models/Enums.js';
 import type { PublicUser, User } from '../models/User.js';
+import { EmailService } from '../email/emailService.js';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +17,7 @@ export class AuthService {
     private readonly userService: UserService,
     private readonly jwtService: JwtService,
     private readonly db: DatabaseService,
+    private readonly emailService: EmailService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ user: PublicUser; accessToken: string; refreshToken: string }> {
@@ -41,7 +44,7 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<{ user: PublicUser; accessToken: string; refreshToken: string }> {
     const user = await this.userService.findByEmail(dto.email);
-    if (!user) {
+    if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -152,6 +155,129 @@ export class AuthService {
       `UPDATE public.refresh_tokens SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`,
       [userId],
     );
+  }
+
+  async requestPasswordReset(email: string): Promise<{ message: string; resetToken?: string }> {
+    const user = await this.userService.findByEmail(email);
+    if (!user) {
+      return { message: 'If an account with that email exists, a password reset link has been sent' };
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const tokenHash = await bcrypt.hash(token, 10);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    const userId = (user as any).userId || (user as any).user_id;
+    await this.db.query(
+      `INSERT INTO public.password_reset_tokens (user_id, token_hash, expires_at)
+       VALUES ($1, $2, $3)`,
+      [userId, tokenHash, expiresAt],
+    );
+
+    try {
+      await this.emailService.sendPasswordResetEmail(user.email, token);
+    } catch (err) {
+      console.error('[AuthService] Failed to send reset email:', err);
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      return { message: 'If an account with that email exists, a password reset link has been sent', resetToken: token };
+    }
+
+    return { message: 'If an account with that email exists, a password reset link has been sent' };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    if (!token || !newPassword) {
+      throw new UnauthorizedException('Invalid or expired password reset token');
+    }
+    const result = await this.db.query(
+      `SELECT token_id, user_id, token_hash, expires_at, used_at
+       FROM public.password_reset_tokens
+       WHERE expires_at > now() AND used_at IS NULL`,
+      [],
+    );
+
+    let tokenRecord: any = null;
+    for (const row of result.rows) {
+      try {
+        const valid = await bcrypt.compare(token, row.token_hash);
+        if (valid) {
+          tokenRecord = row;
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    if (!tokenRecord) {
+      throw new UnauthorizedException('Invalid or expired password reset token');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const userId = tokenRecord.user_id;
+    await this.db.query(
+      `UPDATE public.users SET password_hash = $1, updated_at = now() WHERE user_id = $2`,
+      [passwordHash, userId],
+    );
+    await this.db.query(
+      `UPDATE public.password_reset_tokens SET used_at = now() WHERE token_id = $1`,
+      [tokenRecord.token_id],
+    );
+    await this.revokeRefreshTokensForUser(userId);
+
+    return { message: 'Password has been reset successfully' };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('Cannot change password for accounts without a password');
+    }
+    if (!currentPassword || !newPassword) {
+      throw new UnauthorizedException('Current password and new password are required');
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.db.query(
+      `UPDATE public.users SET password_hash = $1, updated_at = now() WHERE user_id = $2`,
+      [passwordHash, userId],
+    );
+    await this.revokeRefreshTokensForUser(userId);
+
+    return { message: 'Password has been changed successfully' };
+  }
+
+  async setPassword(userId: string, newPassword: string, confirmPassword: string): Promise<{ message: string }> {
+    if (!newPassword || !confirmPassword) {
+      throw new UnauthorizedException('New password and confirm password are required');
+    }
+    if (newPassword !== confirmPassword) {
+      throw new UnauthorizedException('Passwords do not match');
+    }
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    if (user.passwordHash) {
+      throw new UnauthorizedException('Password already exists. Use change-password instead.');
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.db.query(
+      `UPDATE public.users SET password_hash = $1, updated_at = now() WHERE user_id = $2`,
+      [passwordHash, userId],
+    );
+    await this.revokeRefreshTokensForUser(userId);
+    return { message: 'Password has been set successfully' };
   }
 
   private generateUuid(): string {

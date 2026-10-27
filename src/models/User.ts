@@ -7,7 +7,7 @@ export type User = {
   name: string;
   email: string;
   phoneNumber: string | null;
-  passwordHash: string;
+  passwordHash: string | null;
   role: StoredUserRole;
   kycStatus: VerificationStatus;
   createdAt: Date;
