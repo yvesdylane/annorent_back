@@ -1,0 +1,28 @@
+
+POST /auth/forgot-password (or /auth/forgotPassword, /auth/password/forgot)
+Body: {"email":"user@example.com"}
+200 {"message":"If an account with that email exists, a password reset link has been sent","resetToken":"..."} (dev)
+
+GET /auth/reset-password?token=...
+Returns HTML page informing user code will be sent to phone on file
+
+POST /auth/reset-password/confirm
+Body: token
+Redirects to /auth/reset-password/verify
+
+GET /auth/reset-password/verify?token=...
+Returns HTML form to enter code and new password
+
+POST /auth/reset-password (or /auth/resetPassword, /auth/password/reset)
+Body: {"token":"...","newPassword":"newpass123"} (or password/code)
+200 {"message":"Password has been reset successfully"}
+
+POST /auth/change-password (auth required)
+Headers: Authorization: Bearer <accessToken>
+Body: {"currentPassword":"old","newPassword":"new"}
+200 {"message":"Password has been changed successfully"}
+
+POST /auth/set-password (auth required, for Google accounts without password)
+Headers: Authorization: Bearer <accessToken>
+Body: {"newPassword":"newpass123","confirmPassword":"newpass123"}
+200 {"message":"Password has been set successfully"}
