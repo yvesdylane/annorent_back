@@ -27,13 +27,6 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  @Post('admin/login')
-  async adminLogin(@Body() body: any) {
-    const email = body.email || body.username;
-    const password = body.password;
-    return this.authService.adminLogin(email, password);
-  }
-
   @Post('refresh')
   async refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto.refreshToken);

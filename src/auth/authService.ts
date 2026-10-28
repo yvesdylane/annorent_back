@@ -280,28 +280,7 @@ export class AuthService {
     return { message: 'Password has been set successfully' };
   }
 
-  async adminLogin(email: string, password: string): Promise<{ user: PublicUser; accessToken: string; refreshToken: string }> {
-    const adminEmails = (process.env.ADMIN_EMAILS || '')
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-    const adminPassword = process.env.ADMIN_PASSWORD;
-
-    if (!adminEmails.includes((email || '').toLowerCase())) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-    if (adminPassword && password !== adminPassword) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const user = await this.userService.findByEmail(email);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const { accessToken, refreshToken } = await this.issueTokens(user);
-    return { user: this.userService.toPublicUser(user), accessToken, refreshToken };
-  }
+  // Admin login removed - use POST /auth/login with admin credentials from env (auto-seeded on startup)
 
   private generateUuid(): string {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {

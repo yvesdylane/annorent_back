@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { DatabaseService } from './db/databaseService.js';
 import { runMigrations } from './db/migrate.js';
+import { seedAdmin } from './db/seedAdmin.js';
 import { getPort } from './config/env.js';
 import helmet from 'helmet';
 
@@ -29,6 +30,7 @@ async function bootstrap() {
     } else {
       console.log('[Bootstrap] No pending migrations');
     }
+    await seedAdmin(db.getPool());
   } catch (err) {
     console.error('[Bootstrap] Error:', err instanceof Error ? err.message : String(err));
     await app.close();

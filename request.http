@@ -1,6 +1,8 @@
 @baseUrl = http://localhost:3000
-@email = john@example.com
-@password = password123
+#@email = john@example.com
+#@password = password123
+@email = admin@example.com
+@password = 1234qwer
 
 ### GET /hello
 GET {{baseUrl}}/hello
