@@ -4,6 +4,8 @@ import { DatabaseModule } from './db/dbModule.js';
 import { UserModule } from './userModule.js';
 import { AuthModule } from './auth/authModule.js';
 import { SanitizeMiddleware } from './middleware/sanitizeMiddleware.js';
+import { KycModule } from './kyc/kycModule.js';
+import { StorageModule } from './storage/storageModule.js';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { SanitizeMiddleware } from './middleware/sanitizeMiddleware.js';
     DatabaseModule,
     AuthModule,
     UserModule,
+    KycModule,
+    StorageModule,
   ],
 })
 export class AppModule implements NestModule {

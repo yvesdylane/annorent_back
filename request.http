@@ -89,3 +89,42 @@ Accept: application/json
 
 ### GET /auth/google
 GET {{baseUrl}}/auth/google
+
+### POST /auth/admin/login (using env vars)
+# @name adminLogin
+POST {{baseUrl}}/auth/admin/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "change-this-password"
+}
+
+> {%
+  client.test("Admin logged in", function () {
+    client.assert(response.status === 200 || response.status === 201, "Expected 2xx response");
+    client.assert(!!response.body.accessToken, "Missing accessToken");
+  });
+  client.global.set("adminAccessToken", response.body.accessToken);
+%}
+
+### GET /admin/kyc?status=pending (validate pending owner KYC)
+GET {{baseUrl}}/admin/kyc?status=pending
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json
+
+### POST /admin/kyc/:id/approve
+POST {{baseUrl}}/admin/kyc/{{kycSubmissionId}}/approve
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json
+
+### POST /admin/kyc/:id/reject
+POST {{baseUrl}}/admin/kyc/{{kycSubmissionId}}/reject
+Authorization: Bearer {{adminAccessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "rejectionReason": "Invalid document"
+}
