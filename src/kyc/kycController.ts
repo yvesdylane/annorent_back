@@ -1,9 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Body, Controller, Get, Param, Post, Query, Req, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard.js';
 import { AdminGuard } from '../auth/guards/adminGuard.js';
 import { KycService } from './kycService.js';
-import { ApplyKycDto } from './dto/applyKycDto.js';
 import { RejectKycDto } from './dto/rejectKycDto.js';
 import * as fs from 'fs';
 import type { Response } from 'express';
@@ -14,9 +13,28 @@ export class KycController {
   constructor(private readonly kycService: KycService) {}
 
   @Post('apply')
-  apply(@Req() req: any, @Body() dto: ApplyKycDto) {
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'id_front', maxCount: 1 },
+      { name: 'idBack', maxCount: 1 },
+      { name: 'id_back', maxCount: 1 },
+      { name: 'selfie_with_id', maxCount: 1 },
+      { name: 'selfieWithId', maxCount: 1 },
+      { name: 'taxpayer_id_proof', maxCount: 1 },
+      { name: 'taxpayerIdProof', maxCount: 1 },
+      { name: 'rccm', maxCount: 1 },
+      { name: 'niu', maxCount: 1 },
+      { name: 'legal_rep_id_front', maxCount: 1 },
+      { name: 'legalRepIdFront', maxCount: 1 },
+      { name: 'legal_rep_id_back', maxCount: 1 },
+      { name: 'legalRepIdBack', maxCount: 1 },
+      { name: 'legal_rep_selfie_with_id', maxCount: 1 },
+      { name: 'legalRepSelfieWithId', maxCount: 1 },
+    ]),
+  )
+  apply(@Req() req: any, @Body() body: any, @UploadedFiles() files: any) {
     const userId = req.user?.userId || req.user?.sub;
-    return this.kycService.apply(userId, dto);
+    return this.kycService.applyAll(userId, body, files || {});
   }
 
   @Get('status')
@@ -25,24 +43,9 @@ export class KycController {
     return this.kycService.getStatus(userId);
   }
 
-  @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
-  upload(@Req() req: any, @Query('submissionId') submissionId: string, @Query('type') type: string, @UploadedFile() file: Express.Multer.File) {
-    const userId = req.user?.userId || req.user?.sub;
-    return this.kycService.uploadDocument(userId, submissionId, type, file);
-  }
-
-  @Post('submit')
-  submit(@Req() req: any, @Body() body: any) {
-    const userId = req.user?.userId || req.user?.sub;
-    const submissionId = body.submissionId;
-    return this.kycService.submit(userId, submissionId);
-  }
-
   @Get('documents/:documentId/download')
   async download(@Req() req: any, @Param('documentId') documentId: string, @Res() res: Response) {
     const userId = req.user?.userId || req.user?.sub;
-    // Get document
     const db = (this.kycService as any).db;
     const result = await db.query(
       `SELECT d.storage_path, d.mime_type, s.user_id FROM public.kyc_documents d JOIN public.kyc_submissions s ON s.id = d.submission_id WHERE d.id = $1`,

@@ -27,7 +27,7 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const role = (dto.role as any) || UserRole.Tenant;
+    const role = UserRole.Tenant;
 
     const user = await this.userService.createUser({
       name: dto.name,

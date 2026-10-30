@@ -1,8 +1,8 @@
 @baseUrl = http://localhost:3000
-#@email = john@example.com
-#@password = password123
-@email = admin@example.com
-@password = 1234qwer
+@userEmail = testuser@example.com
+@userPassword = password123
+@adminEmail = admin@example.com
+@adminPassword = 1234qwer
 
 ### GET /hello
 GET {{baseUrl}}/hello
@@ -15,16 +15,16 @@ Accept: application/json
   });
 %}
 
-### POST /auth/register
+### POST /auth/register (tenant)
 # @name register
 POST {{baseUrl}}/auth/register
 Content-Type: application/json
 Accept: application/json
 
 {
-  "name": "John Doe",
-  "email": "{{email}}",
-  "password": "{{password}}",
+  "name": "Test User",
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}",
   "phoneNumber": null
 }
 
@@ -38,15 +38,15 @@ Accept: application/json
   client.global.set("refreshToken", response.body.refreshToken);
 %}
 
-### POST /auth/login
+### POST /auth/login (user)
 # @name login
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 Accept: application/json
 
 {
-  "email": "{{email}}",
-  "password": "{{password}}"
+  "email": "{{userEmail}}",
+  "password": "{{userPassword}}"
 }
 
 > {%
@@ -56,6 +56,26 @@ Accept: application/json
   });
   client.global.set("accessToken", response.body.accessToken);
   client.global.set("refreshToken", response.body.refreshToken);
+%}
+
+### POST /auth/login (admin)
+# @name adminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+> {%
+  client.test("Admin logged in", function () {
+    client.assert(response.status === 200 || response.status === 201, "Expected 2xx response");
+    client.assert(!!response.body.accessToken, "Missing accessToken");
+  });
+  client.global.set("adminAccessToken", response.body.accessToken);
+  client.global.set("adminRefreshToken", response.body.refreshToken);
 %}
 
 ### POST /auth/refresh
@@ -89,32 +109,202 @@ Accept: application/json
   });
 %}
 
-### GET /auth/google
-GET {{baseUrl}}/auth/google
-
-### POST /auth/admin/login (using env vars)
-# @name adminLogin
-POST {{baseUrl}}/auth/admin/login
+### POST /auth/forgot-password
+POST {{baseUrl}}/auth/forgot-password
 Content-Type: application/json
 Accept: application/json
 
 {
-  "email": "admin@example.com",
-  "password": "change-this-password"
+  "email": "{{userEmail}}"
 }
 
+### POST /auth/change-password (auth required)
+POST {{baseUrl}}/auth/change-password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "currentPassword": "{{userPassword}}",
+  "newPassword": "newpass123"
+}
+
+### POST /auth/set-password (auth required, for accounts without password)
+POST {{baseUrl}}/auth/set-password
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+Accept: application/json
+
+{
+  "newPassword": "newpass123",
+  "confirmPassword": "newpass123"
+}
+
+### GET /auth/google
+GET {{baseUrl}}/auth/google
+
+### POST /owner/kyc/apply (individual - single request with all files)
+# @name applyIndividual
+POST {{baseUrl}}/owner/kyc/apply
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="applicantType"
+
+individual
+--WebAppBoundary
+Content-Disposition: form-data; name="documentType"
+
+cni
+--WebAppBoundary
+Content-Disposition: form-data; name="documentNumber"
+
+CM123456789
+--WebAppBoundary
+Content-Disposition: form-data; name="fullLegalName"
+
+Test User
+--WebAppBoundary
+Content-Disposition: form-data; name="dateOfBirth"
+
+1990-01-01
+--WebAppBoundary
+Content-Disposition: form-data; name="taxpayerIdNumber"
+
+M01234567890
+--WebAppBoundary
+Content-Disposition: form-data; name="phoneNumber"
+
++237690000000
+--WebAppBoundary
+Content-Disposition: form-data; name="id_front"; filename="id_front.jpg"
+Content-Type: image/jpeg
+
+< ./test-assets/id_front.jpg
+--WebAppBoundary
+Content-Disposition: form-data; name="id_back"; filename="id_back.jpg"
+Content-Type: image/jpeg
+
+< ./test-assets/id_back.jpg
+--WebAppBoundary
+Content-Disposition: form-data; name="selfie_with_id"; filename="selfie.jpg"
+Content-Type: image/jpeg
+
+< ./test-assets/selfie.jpg
+--WebAppBoundary
+Content-Disposition: form-data; name="taxpayer_id_proof"; filename="taxpayer.jpg"
+Content-Type: image/jpeg
+
+< ./test-assets/taxpayer.jpg
+--WebAppBoundary--
+
 > {%
-  client.test("Admin logged in", function () {
-    client.assert(response.status === 200 || response.status === 201, "Expected 2xx response");
-    client.assert(!!response.body.accessToken, "Missing accessToken");
+  client.test("Individual KYC applied", function () {
+    client.assert(response.status === 201 || response.status === 200, "Expected 2xx response");
+    client.assert(!!response.body.submission, "Missing submission");
   });
-  client.global.set("adminAccessToken", response.body.accessToken);
+  if (response.body.submission && response.body.submission.id) {
+    client.global.set("kycSubmissionId", response.body.submission.id);
+  }
 %}
 
-### GET /admin/kyc?status=pending (validate pending owner KYC)
+### GET /owner/kyc/status
+GET {{baseUrl}}/owner/kyc/status
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### GET /owner/kyc/documents/:documentId/download
+GET {{baseUrl}}/owner/kyc/documents/{{kycDocId}}/download
+Authorization: Bearer {{accessToken}}
+
+### POST /owner/kyc/apply (business - single request with all files)
+# @name applyBusiness
+POST {{baseUrl}}/owner/kyc/apply
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=WebAppBoundary
+
+--WebAppBoundary
+Content-Disposition: form-data; name="applicantType"
+
+business
+--WebAppBoundary
+Content-Disposition: form-data; name="businessName"
+
+Test Business SARL
+--WebAppBoundary
+Content-Disposition: form-data; name="rccmNumber"
+
+RC/YAE/2024/B/12345
+--WebAppBoundary
+Content-Disposition: form-data; name="niuNumber"
+
+M123456789012
+--WebAppBoundary
+Content-Disposition: form-data; name="legalRepresentativeName"
+
+Test User
+--WebAppBoundary
+Content-Disposition: form-data; name="legalRepresentativePhone"
+
++237690000000
+--WebAppBoundary
+Content-Disposition: form-data; name="documentType"
+
+cni
+--WebAppBoundary
+Content-Disposition: form-data; name="documentNumber"
+
+CM123456789
+--WebAppBoundary
+Content-Disposition: form-data; name="fullLegalName"
+
+Test User
+--WebAppBoundary
+Content-Disposition: form-data; name="rccm"; filename="rccm.jpg"
+Content-Type: image/jpeg
+
+< ./test-assets/rccm.jpg
+--WebAppBoundary
+Content-Disposition: form-data; name="legal_rep_id_front"; filename="legal_rep_id_front.jpg"
+Content-Type: image/jpeg
+
+< ./test-assets/legal_rep_id_front.jpg
+--WebAppBoundary
+Content-Disposition: form-data; name="legal_rep_id_back"; filename="legal_rep_id_back.jpg"
+Content-Type: image/jpeg
+
+< ./test-assets/legal_rep_id_back.jpg
+--WebAppBoundary
+Content-Disposition: form-data; name="legal_rep_selfie_with_id"; filename="legal_rep_selfie.jpg"
+Content-Type: image/jpeg
+
+< ./test-assets/legal_rep_selfie.jpg
+--WebAppBoundary--
+
+> {%
+  client.test("Business KYC applied", function () {
+    client.assert(response.status === 201 || response.status === 200, "Expected 2xx response");
+    client.assert(!!response.body.submission, "Missing submission");
+  });
+  if (response.body.submission && response.body.submission.id) {
+    client.global.set("kycBusinessSubmissionId", response.body.submission.id);
+  }
+%}
+
+### GET /admin/kyc?status=pending
 GET {{baseUrl}}/admin/kyc?status=pending
 Authorization: Bearer {{adminAccessToken}}
 Accept: application/json
+
+### GET /admin/kyc/:id
+GET {{baseUrl}}/admin/kyc/{{kycSubmissionId}}
+Authorization: Bearer {{adminAccessToken}}
+Accept: application/json
+
+### GET /admin/kyc/documents/:documentId/download
+GET {{baseUrl}}/admin/kyc/documents/{{kycDocId}}/download
+Authorization: Bearer {{adminAccessToken}}
 
 ### POST /admin/kyc/:id/approve
 POST {{baseUrl}}/admin/kyc/{{kycSubmissionId}}/approve
